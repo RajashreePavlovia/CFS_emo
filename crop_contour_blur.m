@@ -27,9 +27,9 @@ close all;
 % INPUT AND OUTPUT FOLDERS
 % ================================================================
 
-inputFolder = 'D:\CFS\Expt_emo\Stimuli\cfs_desaturated';
+inputFolder = 'D:\CFS\Expt_emo\Stimuli\practice_faces';
 
-outputFolder = 'D:\CFS\Expt_emo\Stimuli\crop_contour_blur_desat';
+outputFolder = 'D:\CFS\Expt_emo\Stimuli\practice_crop_contour_blur';
 
 if ~exist(outputFolder,'dir')
     mkdir(outputFolder);
@@ -329,14 +329,15 @@ for i = 1:imageCounter
 
 end
 
-%% Common gray background
+% FIXED to match the experiment's screen background exactly
+% (cfg.background_rgb = [95 95 95] in the task), instead of being
+% computed from the images -- this guarantees the feathered corners are
+% pixel-identical to the on-screen background, with zero visible seam.
+maskBackground = 95/255;
 
-maskBackground = mean(edgeValuesAll);
-
-fprintf('Common background gray = %.5f\n',maskBackground);
-
-fprintf('Equivalent 8-bit gray = %.2f\n', ...
-    maskBackground*255);
+fprintf('Common background gray (FIXED to match experiment) = %.5f\n', maskBackground);
+fprintf('Equivalent 8-bit gray = %.2f\n', maskBackground*255);
+fprintf('(For reference, the images'' own measured edge gray was %.5f)\n', mean(edgeValuesAll));
 
 %% ================================================================
 % THIRD PASS
@@ -351,21 +352,11 @@ for i = 1:imageCounter
 
     img = allImages{i};
 
-    %% ------------------------------------------------------------
-    % Blend face with gray background
-    %
-    % alpha = 1 inside face
-    % alpha = 0 outside face
-    % ------------------------------------------------------------
+    % Blend image with experiment background
+    finalImg = alpha .* img + ...
+               (1-alpha) .* maskBackground;
 
-    finalImg = ...
-        alpha .* img + ...
-        (1-alpha) .* maskBackground;
-
-    %% ------------------------------------------------------------
     % Store final image
-    % ------------------------------------------------------------
-
     allImages{i} = finalImg;
 
 end
@@ -399,8 +390,8 @@ for i = 1:imageCounter
     outputPath = ...
         fullfile(categoryOutputFolder,outputFilename);
 
-    imwrite(allImages{i},outputPath);
-
+    imwrite(allImages{i},outputPath, ...
+        'Alpha',uint8(alpha*255));
 end
 
 %% ================================================================
@@ -584,27 +575,27 @@ fprintf('\nFeather width = %d pixels\n', ...
 
 fprintf('\nDone!\n');
 
-%% ================================================================
-% CROP EACH IMAGE TO THE BOUNDING BOX OF THE ELLIPSE
+%%% ================================================================
+% CROP EACH IMAGE TO THE OUTER EDGE OF THE FEATHER
 % ================================================================
 
-% Find ellipse bounding box
+% Crop to the outer edge of the 10-pixel feather.
+% This keeps the entire feathered transition.
 
-xMin = floor(centerX - radiusX);
-xMax = ceil(centerX + radiusX);
+xMin = floor(centerX - radiusX) - featherPixels;
+xMax = ceil(centerX + radiusX) + featherPixels;
 
-yMin = floor(centerY - radiusY);
-yMax = ceil(centerY + radiusY);
+yMin = floor(centerY - radiusY) - featherPixels;
+yMax = ceil(centerY + radiusY) + featherPixels;
 
 % Make sure coordinates stay inside image
-
 xMin = max(1,xMin);
 xMax = min(outputWidth,xMax);
 
 yMin = max(1,yMin);
 yMax = min(outputHeight,yMax);
 
-fprintf('\nEllipse bounding box:\n');
+fprintf('\nFeather-edge bounding box:\n');
 fprintf('Width  = %d pixels\n',xMax-xMin+1);
 fprintf('Height = %d pixels\n',yMax-yMin+1);
 
@@ -626,6 +617,7 @@ for i = 1:imageCounter
     %% Crop exactly to ellipse boundary
 
     croppedImg = allImages{i}(yMin:yMax,xMin:xMax);
+    croppedAlpha = alpha(yMin:yMax,xMin:xMax);
 
     %% Save as PNG
 
@@ -634,6 +626,6 @@ for i = 1:imageCounter
     outputPath = ...
         fullfile(categoryOutputFolder,outputFilename);
 
-    imwrite(croppedImg,outputPath);
-
+    imwrite(croppedImg,outputPath, ...
+      'Alpha',uint8(croppedAlpha*255));
 end

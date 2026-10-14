@@ -73,7 +73,7 @@ cfg.arrow_width_px  = 12; % midpoint of your 10-15px suggestion; adjust freely
 cfg.arrow_backdrop_padding_px = 8; % extra margin around the arrow for its background patch, so it stays visible against the flickering mask
 
 %% ---- Background --------------------------------------------------------
-cfg.background_rgb = [100 100 100];
+cfg.background_rgb = [95 95 95];
 
 %% ---- Stereoscope / fusion frame geometry (degrees visual angle) --------
 cfg.viewing_distance_cm   = 94;
@@ -91,8 +91,8 @@ cfg.red_boundary_line_deg = 0.01;   % thin red reference line just outside conto
 % Physical screen size MUST be measured (ruler/spec sheet) for accurate
 % degrees-to-pixels conversion -- do not guess from diagonal+aspect ratio,
 % bezels vary. Fill in for EACH display you test on.
-cfg.screen_width_cm  = 31;  % TODO: measure active display width (HP 14s dev laptop)
-cfg.screen_height_cm = 17.4;  % TODO: measure active display height (HP 14s dev laptop)
+cfg.screen_width_cm  = 54.4;  % TODO: measure active display width (HP 14s dev laptop)
+cfg.screen_height_cm = 30.4;  % TODO: measure active display height (HP 14s dev laptop)
 % NOTE: when you move to the BenQ 240Hz monitor, either add a second cfg
 % variant (e.g. config_experiment_benq.m) or overwrite these two fields
 % after loading cfg, so pixels-per-degree is recomputed correctly for
@@ -122,8 +122,8 @@ cfg.calibration_cross_thickness_deg = 0.12;
 cfg.calibration_initial_separation_px = 0; % starting offset for the FIRST calibration only; later blocks start from the previous block's fused position
 
 %% ---- Face stimuli --------------------------------------------------------
-cfg.face_width_deg  = 3.0;
-cfg.face_height_deg = 4.3;
+cfg.face_width_deg  = 2.8;
+cfg.face_height_deg = 4.0;
 cfg.face_eccentricity_deg = cfg.fusion_frame_deg / 4;  % = 1.6 deg at 6.4 deg frame;   % center of face from fixation, i.e. half of half the frame
 
 % 12 identities total. KDEF-style numbering is unique WITHIN each gender,
@@ -156,7 +156,7 @@ cfg.mask_no_immediate_repeat = true;
 % stereoscope needs genuine fullscreen to correctly cover the two screen
 % halves.
 cfg.debug_windowed_mode = true;
-cfg.debug_window_rect = [50 50 1250 800]; % [left top right bottom], only used if debug_windowed_mode
+cfg.debug_window_rect = [50 50 1780 950]; % [left top right bottom], only used if debug_windowed_mode
 
 %% ---- Response keys ---------------------------------------------------
 cfg.keys.target_count_keys = {'1','2','3','4','5'}; % RSVP target-count report (changed from 0-5: minimum possible targets in any trial is 1, so 0 was never a valid answer)
@@ -175,9 +175,9 @@ cfg.practice_face_folder_root = 'D:\CFS\Expt_emo\Stimuli\practice_crop_contour_b
     % looked up by identity/gender like the main experiment's faces. Any
     % number of images per emotion is fine.
 cfg.practice_n_blocks = 4;       % easy-aware, easy-unaware, hard-aware, hard-unaware
-cfg.practice_trials_per_block = 4;
+cfg.practice_trials_per_block = 12;
 cfg.practice_learning_contrast = 1.0;   % faces during learning trials (100%)
-cfg.practice_feedback_s = 1.2;
+cfg.practice_feedback_s = 1.0;
 cfg.practice_pass_easy = 0.80;
 cfg.practice_pass_hard = 0.60;
 cfg.practice_criterion_last_n = 12;     % accuracy uses the last 12 learning trials of each block
@@ -187,8 +187,8 @@ cfg.quest_p_threshold = 0.75;
 cfg.quest_beta = 3.5;
 cfg.quest_delta = 0.02;
 cfg.quest_gamma = 0.05;                 % guess rate is near 0 because "did not see" is an option
-cfg.quest_min_trials = 5;
-cfg.quest_max_trials = 8;
+cfg.quest_min_trials = 30;
+cfg.quest_max_trials = 80;
 cfg.quest_sd_stop = 0.15;               % stop early once the estimate is this stable
 cfg.quest_min_contrast = 0.01;
 cfg.unaware_contrast_fraction = 0.5;    % main-task contrast = this x participant threshold

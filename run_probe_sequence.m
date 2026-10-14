@@ -41,27 +41,48 @@
         probe_result.probe2_rt_s = NaN;
     end
 
-    % --- Probes 3-5: only if NOT on-task ---
-    if ~strcmp(probe_result.probe1_label, 'on-task')
-        [probe_result.metaawareness, probe_result.metaawareness_rt_s] = ...
-            run_probe3_metaawareness(win, cfg, winRect, frameTex, frameDestRects, ppd);
+    % --- Probes 3-5 ---
+    % on-task    : none of them
+    % blank-mind : meta-awareness only
+    % SDT/TRI/SIT: all four
+    label = probe_result.probe1_label;
 
-        [probe_result.vividness, probe_result.vividness_rt_s] = ...
-            run_scale_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, 'How vivid was the thought?');
+    % defaults (skipped = [] / NaN, not 0)
+    probe_result.metaawareness = [];       probe_result.metaawareness_rt_s = NaN;
+    probe_result.emotionality = [];        probe_result.emotionality_rt_s = NaN;
+    probe_result.vividness = [];           probe_result.vividness_rt_s = NaN;
+    probe_result.temporality = [];         probe_result.temporality_rt_s = NaN;
+    probe_result.current_concerns = [];    probe_result.current_concerns_rt_s = NaN;
 
-        [probe_result.emotionality, probe_result.emotionality_rt_s] = ...
-            run_probe_emotionality(win, cfg, winRect, frameTex, frameDestRects, ppd);
-
-        [probe_result.temporality, probe_result.temporality_rt_s] = ...
-            run_probe_temporality(win, cfg, winRect, frameTex, frameDestRects, ppd);
-
-        [probe_result.current_concerns, probe_result.current_concerns_rt_s] = run_scale_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, ...
-            sprintf('Rate the extent to which your thought was relevant\nto your everyday goals, concerns and worries.'));
+    % follow-ups: on-task = none; blank-mind = meta-awareness only;
+    % SDT/TRI/SIT = meta, vividness, emotionality, concerns in random order,
+    % then temporality last (fixed position)
+    if strcmp(label, 'on-task')
+        queue = {};
+    elseif strcmp(label, 'blank-mind')
+        queue = {'meta'};
     else
-        probe_result.metaawareness = [];       probe_result.metaawareness_rt_s = NaN;
-        probe_result.vividness = [];            probe_result.vividness_rt_s = NaN;
-        probe_result.emotionality = [];         probe_result.emotionality_rt_s = NaN;
-        probe_result.temporality = [];          probe_result.temporality_rt_s = NaN;
-        probe_result.current_concerns = [];     probe_result.current_concerns_rt_s = NaN;
+        queue = {'meta','vivid','emotion','temporal','concerns'};
+        queue = queue(randperm(numel(queue)));
     end
-end
+
+    for qi = 1:numel(queue)
+        switch queue{qi}
+            case 'meta'
+                [probe_result.metaawareness, probe_result.metaawareness_rt_s] = ...
+                    run_probe3_metaawareness(win, cfg, winRect, frameTex, frameDestRects, ppd);
+            case 'vivid'
+                [probe_result.vividness, probe_result.vividness_rt_s] = ...
+                    run_scale_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, 'How vivid was the thought?');
+            case 'emotion'
+                [probe_result.emotionality, probe_result.emotionality_rt_s] = ...
+                    run_probe_emotionality(win, cfg, winRect, frameTex, frameDestRects, ppd);
+            case 'temporal'
+                [probe_result.temporality, probe_result.temporality_rt_s] = ...
+                    run_probe_temporality(win, cfg, winRect, frameTex, frameDestRects, ppd);
+            case 'concerns'
+                [probe_result.current_concerns, probe_result.current_concerns_rt_s] = ...
+                    run_scale_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, ...
+                    sprintf('Rate the extent to which your thought was relevant\nto your everyday goals, concerns and worries.'));
+        end
+    end

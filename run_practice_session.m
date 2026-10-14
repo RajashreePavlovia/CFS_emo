@@ -181,11 +181,6 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
             log_path, participant_id, phase1_attempt, block_num, MAX_RSVP_ITEMS);
         quest_thr.(attn)  = thr;
         quest_hist.(attn) = qh;
-
-        % --- practice thought questions at the end of this practice block ---
-        run_practice_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, participant_id, ...
-            probe_log_path, sprintf('phase2_block%d', block_num), n_practice_probes == 0);
-        n_practice_probes = n_practice_probes + 1;
     end
 
     contrast_base = min([quest_thr.low, quest_thr.high]);
@@ -532,8 +527,25 @@ function [faceTextures, identities] = load_practice_faces(win, cfg)
             continue;
         end
 
-        img = imread(fullfile(files(i).folder, files(i).name));
+        % Read image AND PNG alpha channel
+        [img, ~, alpha] = imread(fullfile(files(i).folder, files(i).name));
+
+        % Make grayscale image RGB
+        if ndims(img) == 2
+            img = repmat(img, [1 1 3]);
+        end
+
+        % If there is no alpha channel, treat image as fully opaque
+        if isempty(alpha)
+            alpha = uint8(255 * ones(size(img,1), size(img,2)));
+        end
+
+        % Add alpha as fourth channel
+        img(:,:,4) = alpha;
+
+        % Create PTB texture with transparency preserved
         tex = Screen('MakeTexture', win, img);
+
         faceTextures(face_texture_key(id, gender, emotion)) = tex;
         n_loaded = n_loaded + 1;
 

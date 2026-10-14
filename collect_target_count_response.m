@@ -37,7 +37,7 @@ function [response, rt_s, timed_out, response_abs_time_s, face_report] = collect
     rightKey = KbName(cfg.keys.face_report_keys.right);
     Screen('DrawTexture', win, frameTex, [], frameDestRects.left, 0, 0);
     Screen('DrawTexture', win, frameTex, [], frameDestRects.right, 0, 0);
-    Screen('TextSize', win, 20);
+    Screen('TextSize', win, 14);
 
     domRect = frameDestRects.(dominant_side);
     textX = domRect(1) + 70;

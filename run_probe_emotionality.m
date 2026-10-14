@@ -9,8 +9,14 @@ function [answer, rt_s] = run_probe_emotionality(win, cfg, winRect, frameTex, fr
 %   rt_s   - response time in seconds
 
     options = {'positive','negative','neutral'};
-    lines = {'How emotional was the thought?', '', ...
-              '1 - Positive', '2 - Negative', '3 - Neutral'};
+    options = options(randperm(numel(options)));   % new random order every time
+
+    display_text = struct('positive','Positive', 'negative','Negative', 'neutral','Neutral');
+
+    lines = {'How emotional was the thought?', ''};
+    for i = 1:numel(options)
+        lines{end+1} = sprintf('%d - %s', i, display_text.(options{i})); %#ok<AGROW>
+    end
 
     draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, lines);
     Screen('Flip', win);

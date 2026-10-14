@@ -271,7 +271,7 @@ end
             Screen('FillRect', win, cfg.background_rgb);
             Screen('DrawTexture', win, frameTex, [], frameDestRects.left, 0, 0);
             Screen('DrawTexture', win, frameTex, [], frameDestRects.right, 0, 0);
-            Screen('TextSize', win, 22);
+            Screen('TextSize', win, 16);
             msg = sprintf('Block %d of %d complete.\nTake a short break.\nPress any key to continue.', b, n_blocks);
             DrawFormattedText(win, msg, frameDestRects.left(1)+70, 'center', [255 255 255]);
             DrawFormattedText(win, msg, frameDestRects.right(1)+70, 'center', [255 255 255]);
@@ -279,6 +279,12 @@ end
             wait_any_key();
         end
     end
+    
+        % --- thank-you screen ---
+    thanks_lines = {'Thank you for your participation', 'in our experiment!', '', 'Press any key to exit.'};
+    draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, thanks_lines);
+    Screen('Flip', win);
+    wait_any_key();
 
     Screen('CloseAll');
     sca;

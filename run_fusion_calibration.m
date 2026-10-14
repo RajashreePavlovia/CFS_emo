@@ -172,8 +172,18 @@ function [separation_px, offsets, state] = run_fusion_calibration(win, cfg, ppd,
         Screen('FillRect', win, cfg.background_rgb);
         Screen('DrawTexture', win, frameTex, [], leftDestRect, 0, 0);
         Screen('DrawTexture', win, frameTex, [], rightDestRect, 0, 0);
-        draw_fixation_cross(win, centers.left,  crossSpan, crossThk, [255 255 255]);
-        draw_fixation_cross(win, centers.right, crossSpan, crossThk, [255 255 255]);
+% fusion aid: concentric circles + one big cross spanning the whole frame area
+        half_px = round(cfg.fusion_frame_deg * ppd / 2);   % half the frame's content side
+        n_rings = 5;
+        for c = {centers.left, centers.right}
+            cx = c{1}(1); cy = c{1}(2);
+            for r = 1:n_rings
+                rad = round(half_px * r / n_rings);
+                Screen('FrameOval', win, [255 255 255], [cx-rad cy-rad cx+rad cy+rad], 2);
+            end
+            Screen('FillRect', win, [255 255 255], [cx-half_px, cy-crossThk/2, cx+half_px, cy+crossThk/2]);
+            Screen('FillRect', win, [255 255 255], [cx-crossThk/2, cy-half_px, cx+crossThk/2, cy+half_px]);
+        end
 
         % experimenter-facing text (top of screen)
         effSep = sep + off.right_dx - off.left_dx;

@@ -9,9 +9,11 @@ function [label, rt_s] = run_probe2(win, cfg, winRect, frameTex, frameDestRects,
 %   label - 'arrows', 'masks', 'faces', or 'other'
 %   rt_s  - response time in seconds
 
+    opts = cfg.probe2_options(randperm(numel(cfg.probe2_options)));   % new random order every time
+
     lines = {'Which stimulus from the task was your thought related to?', ''};
-    for i = 1:numel(cfg.probe2_options)
-        lines{end+1} = sprintf('%d - %s', i, cfg.probe2_display_text(cfg.probe2_options{i})); %#ok<AGROW>
+    for i = 1:numel(opts)
+        lines{end+1} = sprintf('%d - %s', i, cfg.probe2_display_text(opts{i})); %#ok<AGROW>
     end
 
     draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, lines);
@@ -19,5 +21,5 @@ function [label, rt_s] = run_probe2(win, cfg, winRect, frameTex, frameDestRects,
 
     [key, rt_s] = collect_keypress_response(cfg.keys.probe2_keys, win);
     idx = str2double(key);
-    label = cfg.probe2_options{idx};
+    label = opts{idx};
 end
