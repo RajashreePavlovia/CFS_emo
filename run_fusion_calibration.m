@@ -46,7 +46,7 @@ function [separation_px, offsets, state] = run_fusion_calibration(win, cfg, ppd,
     keyW      = KbName('w');
     keyS      = KbName('s');
     keyTab    = KbName('Tab');
-    keyReturn = KbName('Return');
+    keyReturn = KbName('Space');
     keyEscape = KbName('ESCAPE');
 
     stepSmall = cfg.calibration_step_small_px;
@@ -189,9 +189,9 @@ function [separation_px, offsets, state] = run_fusion_calibration(win, cfg, ppd,
         effSep = sep + off.right_dx - off.left_dx;
         vertDiff = off.right_dy - off.left_dy;
         if carried
-            prompt = 'ARE THE FRAMES STILL FUSED?   YES: press Return.   NO: adjust, then press Return.';
+            prompt = 'ARE THE FRAMES STILL FUSED?   YES: press space.   NO: adjust, then press space.';
         else
-            prompt = 'Adjust until the two frames fuse, then press Return.';
+            prompt = 'Adjust until the two frames fuse, then press space.';
         end
         statusStr = sprintf(['Participant %d | Block %d | separation %d px | vertical offset %d px | MOVING: %s\n' ...
             '%s\n' ...

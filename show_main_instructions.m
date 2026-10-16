@@ -1,23 +1,28 @@
-function show_main_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd)
+function ctx = show_main_instructions(win, cfg, frameTex, winRect, ctx, ppd)
 % SHOW_MAIN_INSTRUCTIONS  Short instruction pages shown once, before the first
 % block of the MAIN session (after practice). Covers the face-location report
-% that follows every count response, the thought questions, and the pause key.
+% that follows every count response, the thought questions, and the pause and
+% recalibration keys.
 %
-%   show_main_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd)
+%   ctx = show_main_instructions(win, cfg, frameTex, winRect, ctx, ppd)
 %
-% Any key = next page, Backspace = previous page, Escape = abort.
+% ctx is the calibration context from make_calib_ctx (it carries the current
+% frameDestRects) and is returned, because pressing C on any page runs the
+% fusion calibration and the page is then redrawn on the new frame positions.
+%
+% Any key = next page, Backspace = previous page, C = recalibrate, Escape = abort.
 % Pages are kept short because the fusion frame is small (about 285 px wide
 % on the 1920x1080 Legion at 60 cm). If a page triggers the
 % 'draw_probe_screen:textOutsideFrame' warning, split it into two pages.
 
     KbName('UnifyKeyNames');
-    escKey  = KbName('ESCAPE');
     backKey = KbName('BackSpace');
 
     leftLbl  = key_label(cfg.keys.face_report_keys.left);
     rightLbl = key_label(cfg.keys.face_report_keys.right);
     noneLbl  = key_label(cfg.keys.quest_none_key);
     pauseLbl = key_label(cfg.keys.pause_key);
+    calibLbl = key_label(cfg.keys.calib_key);
 
     pages = {};
 
@@ -42,7 +47,8 @@ function show_main_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd
 
     pages{end+1} = { ...
         'PAUSE', '', ...
-        sprintf('To pause, press %s during the blank pause between two trials.', pauseLbl), '', ...
+        sprintf('To pause, press %s at any time. The pause starts when the current trial has finished.', pauseLbl), '', ...
+        sprintf('If the two frames stop fusing, press %s. The trial finishes first, then you can adjust.', calibLbl), '', ...
         'Press any key to begin.'};
 
     n_pages = numel(pages);
@@ -52,36 +58,14 @@ function show_main_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd
         if i < n_pages
             lines = [lines, {'', 'Press any key to continue.'}];
         end
-        draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, lines);
-        Screen('Flip', win);
+        [ctx, ~, keyCode] = wait_key_or_calib(win, cfg, ppd, winRect, ctx, ...
+            @(c) flip_probe_screen(win, cfg, frameTex, winRect, c.frameDestRects, ppd, lines));
 
-        nav = wait_for_nav_key(escKey, backKey);
-        if strcmp(nav, 'back')
+        if keyCode(backKey)
             i = max(1, i - 1);
         else
             i = i + 1;
         end
-    end
-end
-
-
-function nav = wait_for_nav_key(escKey, backKey)
-    while KbCheck; end
-    while true
-        [keyIsDown, ~, keyCode] = KbCheck;
-        if keyIsDown
-            if keyCode(escKey)
-                error('show_main_instructions:userAbort', 'User pressed Escape -- aborting.');
-            end
-            if keyCode(backKey)
-                nav = 'back';
-            else
-                nav = 'next';
-            end
-            while KbCheck; end
-            return;
-        end
-        WaitSecs(0.001);
     end
 end
 

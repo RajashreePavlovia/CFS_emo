@@ -21,6 +21,8 @@ function [report, secs, rt_s] = ask_face_side(win, cfg, frameTex, winRect, frame
     leftKey  = KbName(cfg.keys.face_report_keys.left);
     rightKey = KbName(cfg.keys.face_report_keys.right);
     noneKey  = KbName(cfg.keys.quest_none_key);
+    pauseKey = KbName(cfg.keys.pause_key);
+    calibKey = KbName(cfg.keys.calib_key);
 
     lines = {'Where was the face?', '', ...
         sprintf('%s = LEFT', key_label(cfg.keys.face_report_keys.left)), ...
@@ -35,6 +37,13 @@ function [report, secs, rt_s] = ask_face_side(win, cfg, frameTex, winRect, frame
         if keyIsDown
             if keyCode(escKey)
                 error('ask_face_side:userAbort', 'User pressed Escape -- aborting.');
+            end
+            % pause / recalibrate requests are only latched (acted on after the trial)
+            if keyCode(pauseKey)
+                key_flag('pause', 'set');
+            end
+            if keyCode(calibKey)
+                key_flag('calib', 'set');
             end
             if keyCode(leftKey)
                 report = 'left';
