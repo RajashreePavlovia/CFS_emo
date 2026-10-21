@@ -14,17 +14,7 @@ cfg.emotion_levels   = {'happy','angry','neutral'};
 
 cfg.reps_per_condition   = 2;   % each of the 12 conditions shown twice
 cfg.trials_per_block     = 36;
-cfg.probe_trial_range    = [15 36]; % used ONLY when probes_per_block = 1: probe occurs after a trial in this range (inclusive)
-
-% --- thought probes per block (see choose_probe_trials.m) ---
-% 1 = original design (one probe, trial 15-36).
-% 2 = two probes per block: both at least cfg.probe_first_min trials into the
-%     block and at least cfg.probe_min_gap trials apart, so the 10-12 trial
-%     pre-probe windows of the two probes never share trials.
-%     (36 trials, first_min 12, gap 12 -> first probe in 12-24, second in first+12 .. 36)
-cfg.probes_per_block = 2;
-cfg.probe_first_min  = 12;
-cfg.probe_min_gap    = 12;
+cfg.probe_trial_range    = [15 36]; % probe occurs after a trial in this range (inclusive)
 cfg.n_catch_trials_per_block = 3;   % trials where a black square replaces the face (instead of, not in addition to, 3 of the 36 trials)
 
 % target-count ranges per load (from RSVP perceptual-load task spec)
@@ -37,7 +27,8 @@ cfg.rsvp_isi_s           = 133 / 1000;  % 133ms blank gap between items (changed
 cfg.pretrial_fixation_s  = 0.2;            % 200ms fixation cross at the very start of every trial
 cfg.fixation_cross_deg   = 0.5;            % size of that cross
 cfg.fixation_cross_thickness_deg = 0.06;
-cfg.iti_s                = 1.5;            % inter-trial interval within a block (changed from 1.5s)
+cfg.fixation_duration_s  = 0.5;            % 500ms fixation before RSVP+face+mask onset
+cfg.iti_s                = 2.0;            % inter-trial interval within a block (changed from 1.5s)
 cfg.max_response_time_s  = 3.0;            % max time to report target count for a trial
 
 %% ---- RSVP arrow colors (RGB 0-255) -------------------------------------
@@ -173,8 +164,7 @@ cfg.keys.probe1_keys = {'1','2','3','4','5'};           % on-task/SDT/TRI/SIT/bl
 cfg.keys.probe2_keys = {'1','2','3','4'};               % which stimulus (arrows/masks/faces/other)
 cfg.keys.yesno_keys  = struct('yes','LeftArrow','no','RightArrow');
 cfg.keys.scale_keys  = {'1','2','3','4','5','6','7'};   % vividness / temporality-as-4pt / current-concerns
-cfg.keys.pause_key = 'p';                                % global pause: latched anywhere in a trial, shown when that trial finishes
-cfg.keys.calib_key = 'c';                                % recalibrate fusion frames: works on every screen; during a trial/probe it is latched and the calibration screen appears when the trial (and any probe) has finished
+cfg.keys.pause_key = 'p';                                % global pause, checked between trials
 cfg.keys.face_report_keys = struct('left','LeftArrow','right','RightArrow'); % unaware-trial face-location report, checked continuously during the RSVP+mask stream
 
 %% ---- Practice session ---------------------------------------------------
@@ -197,8 +187,8 @@ cfg.quest_p_threshold = 0.75;
 cfg.quest_beta = 3.5;
 cfg.quest_delta = 0.02;
 cfg.quest_gamma = 0.05;                 % guess rate is near 0 because "did not see" is an option
-cfg.quest_min_trials = 20;
-cfg.quest_max_trials = 50;
+cfg.quest_min_trials = 30;
+cfg.quest_max_trials = 80;
 cfg.quest_sd_stop = 0.15;               % stop early once the estimate is this stable
 cfg.quest_min_contrast = 0.01;
 cfg.unaware_contrast_fraction = 0.5;    % main-task contrast = this x participant threshold

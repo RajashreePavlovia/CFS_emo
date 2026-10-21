@@ -79,8 +79,6 @@ function log = run_trial_stimulus_stream(win, cfg, ifi, ppd, trial, awareness, f
     escKey = KbName('ESCAPE');
     leftKey = KbName(cfg.keys.face_report_keys.left);
     rightKey = KbName(cfg.keys.face_report_keys.right);
-    pauseKey = KbName(cfg.keys.pause_key);
-    calibKey = KbName(cfg.keys.calib_key);
 
     n_frames_per_item = round(cfg.rsvp_item_duration_s / ifi);
     n_frames_isi = round(cfg.rsvp_isi_s / ifi); % blank gap frames between items (0 if rsvp_isi_s is 0)
@@ -161,15 +159,6 @@ function log = run_trial_stimulus_stream(win, cfg, ifi, ppd, trial, awareness, f
         if keyIsDown
             if keyCode(escKey)
                 error('run_trial_stimulus_stream:userAbort', 'User pressed Escape -- aborting.');
-            end
-            % pause / recalibrate requests are only LATCHED here (never
-            % interrupt the stream); the session acts on them after the trial.
-            if keyCode(pauseKey)
-                key_flag('pause', 'set');
-                log.pause_requested = true;
-            end
-            if keyCode(calibKey)
-                key_flag('calib', 'set');
             end
             if is_unaware && ~log.face_report.reported
                 if keyCode(leftKey)

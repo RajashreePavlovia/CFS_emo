@@ -34,18 +34,10 @@ function trial_result = run_full_trial(win, cfg, ifi, ppd, trial, awareness, fra
 %       .pause_requested       (logical; true if the pause key was pressed
 %                                 anywhere during this trial's RSVP stream
 %                                 or response window)
-%       .calib_requested       (logical; true if C was pressed anywhere during
-%                                 this trial -- the trial itself always runs
-%                                 to completion; the session recalibrates after)
 %
 % NOTE: makes real Screen()/KbCheck calls, untested on real hardware as
 % of writing -- test this on your setup and report back exactly what
 % happens (including any missed-deadline counts PTB reports).
-
-    % P (pause) is consumed once per trial, so start each trial with it clear.
-    % The C (recalibrate) latch is deliberately NOT cleared here: the session
-    % clears it when it actually recalibrates.
-    key_flag('pause', 'clear');
 
     % --- pre-trial fixation cross (cfg.pretrial_fixation_s, default 200 ms) ---
     pre_fix_s = 0;
@@ -73,7 +65,7 @@ function trial_result = run_full_trial(win, cfg, ifi, ppd, trial, awareness, fra
         fixation_onset_vbl = Screen('Flip', win);
     end
 
-    n_fix_frames = round(cfg.pretrial_fixation_s / ifi);
+    n_fix_frames = round(cfg.fixation_duration_s / ifi);
     trial_start_vbl = Screen('Flip', win, fixation_onset_vbl + (n_fix_frames - 0.5) * ifi);
     % NOTE: this flip still shows the same fixation content (nothing new
     % drawn since the last Flip call) -- it exists purely to mark the
@@ -117,7 +109,6 @@ function trial_result = run_full_trial(win, cfg, ifi, ppd, trial, awareness, fra
 
     escKey   = KbName('ESCAPE');
     pauseKey = KbName(cfg.keys.pause_key);
-    calibKey = KbName(cfg.keys.calib_key);
     leftKey  = KbName(cfg.keys.face_report_keys.left);
     rightKey = KbName(cfg.keys.face_report_keys.right);
     is_unaware = strcmpi(awareness, 'unaware') && ~ask_now;
@@ -134,10 +125,6 @@ function trial_result = run_full_trial(win, cfg, ifi, ppd, trial, awareness, fra
             end
             if keyCode(pauseKey)
                 iti_pause_requested = true;
-                key_flag('pause', 'set');
-            end
-            if keyCode(calibKey)
-                key_flag('calib', 'set');   % latched; session recalibrates after this trial
             end
             if is_unaware && ~face_report.reported
                 if keyCode(leftKey)
@@ -170,10 +157,5 @@ function trial_result = run_full_trial(win, cfg, ifi, ppd, trial, awareness, fra
     trial_result.is_catch = isfield(trial, 'is_catch') && trial.is_catch;
     trial_result.face_report = face_report;
     trial_result.face_report_rt_prompt_s = face_rt_prompt;
-    % pause: pressed at ANY point in the trial (stream, response, face report
-    % or ITI) -- the stream/response/face-report loops latch it via key_flag.
-    trial_result.pause_requested = iti_pause_requested || key_flag('pause', 'get');
-    % recalibration requested (C) at any point in the trial; the session acts
-    % on it only after the trial's responses are fully recorded.
-    trial_result.calib_requested = key_flag('calib', 'get');
+    trial_result.pause_requested = iti_pause_requested;
 end

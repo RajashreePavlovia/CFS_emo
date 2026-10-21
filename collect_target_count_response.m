@@ -35,8 +35,6 @@ function [response, rt_s, timed_out, response_abs_time_s, face_report] = collect
     validKeys = cfg.keys.target_count_keys; % {'1','2','3','4','5'}
     leftKey  = KbName(cfg.keys.face_report_keys.left);
     rightKey = KbName(cfg.keys.face_report_keys.right);
-    pauseKey = KbName(cfg.keys.pause_key);
-    calibKey = KbName(cfg.keys.calib_key);
     Screen('DrawTexture', win, frameTex, [], frameDestRects.left, 0, 0);
     Screen('DrawTexture', win, frameTex, [], frameDestRects.right, 0, 0);
     Screen('TextSize', win, 14);
@@ -63,14 +61,6 @@ function [response, rt_s, timed_out, response_abs_time_s, face_report] = collect
 
             if any(strcmpi(names, 'ESCAPE'))
                 error('collect_target_count_response:userAbort', 'User pressed Escape -- aborting.');
-            end
-
-            % pause / recalibrate requests are only latched; the trial goes on
-            if keyCode(pauseKey)
-                key_flag('pause', 'set');
-            end
-            if keyCode(calibKey)
-                key_flag('calib', 'set');
             end
 
                         if is_unaware && ~face_report.reported

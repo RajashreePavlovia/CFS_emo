@@ -54,12 +54,6 @@ function [key_pressed, rt_s] = collect_keypress_response(valid_key_names, win)
                 error('collect_keypress_response:userAbort', 'User pressed Escape -- aborting.');
             end
 
-            % C during a thought probe: never interrupt the question, just
-            % latch it -- the session recalibrates after the probe finishes.
-            if keyCode(KbName('c'))
-                key_flag('calib', 'set');
-            end
-
             for i = 1:numel(names)
                 for j = 1:numel(valid_key_names)
                     if startsWith(names{i}, valid_key_names{j})

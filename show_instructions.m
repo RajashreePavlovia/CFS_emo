@@ -1,15 +1,10 @@
-function ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd)
+function show_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd)
 % SHOW_INSTRUCTIONS  Multi-page instruction screens for the whole task.
 % Text is drawn in BOTH eyes' frames (via draw_probe_screen) so it fuses.
 %
-%   ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd)
-%
-% ctx is the calibration context from make_calib_ctx (it carries the current
-% frameDestRects). It is returned because pressing C on any page runs the
-% fusion calibration and the page is then redrawn on the new frame positions.
+%   show_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd)
 %
 % NAVIGATION: any key = next page, Backspace = previous page,
-%             C = recalibrate the frames (then the same page is shown again),
 %             Escape = abort (throws an error, like the rest of the code).
 %
 % KEY LABELS are read from cfg (face-report keys, pause key, count keys),
@@ -23,10 +18,10 @@ function ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd)
 % Call this AFTER fusion calibration (it needs frameDestRects).
 
     KbName('UnifyKeyNames');
+    escKey  = KbName('ESCAPE');
     backKey = KbName('BackSpace');
 
     pauseLbl = key_label(cfg.keys.pause_key);
-    calibLbl = key_label(cfg.keys.calib_key);
     countLo  = cfg.keys.target_count_keys{1};
     countHi  = cfg.keys.target_count_keys{end};
 
@@ -45,9 +40,7 @@ function ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd)
         '', ...
         'Keep both eyes open and keep looking at the center of the frame for the whole experiment. Try not to move your eyes or head.', ...
         '', ...
-        'Before every block you will adjust the frames until they merge (arrow keys, then Return).', ...
-        '', ...
-        sprintf('If the frames ever stop looking like one, press %s at any time to adjust them again.', calibLbl)};
+        'Before every block you will adjust the frames until they merge (arrow keys, then Return).'};
 
     pages{end+1} = { ...
         'THE ARROW STREAM', '', ...
@@ -72,9 +65,7 @@ function ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd)
 
     pages{end+1} = { ...
         'BREAKS', '', ...
-        sprintf('You can pause at any time by pressing %s. The pause starts when the current trial has finished, and the experiment waits until you press a key to continue.', pauseLbl), ...
-        '', ...
-        sprintf('If the two frames stop fusing, press %s. The current trial finishes first, then you can adjust the frames.', calibLbl), ...
+        sprintf('You can pause at any time during the blank pause between trials by pressing %s. The experiment waits until you press a key to continue.', pauseLbl), ...
         '', ...
         'There is also a break between blocks.'};
 
@@ -99,16 +90,39 @@ function ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd)
             end
         end
 
-        % wait_key_or_calib handles C (recalibrate, then redraw this same
-        % page on the new frames) and Escape; it returns on any other key.
-        [ctx, ~, keyCode] = wait_key_or_calib(win, cfg, ppd, winRect, ctx, ...
-            @(c) flip_probe_screen(win, cfg, frameTex, winRect, c.frameDestRects, ppd, lines));
+        draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, lines);
+        Screen('Flip', win);
 
-        if keyCode(backKey)
+        nav = wait_for_nav_key(escKey, backKey);
+        if strcmp(nav, 'back')
             i = max(1, i - 1);
         else
             i = i + 1;
         end
+    end
+end
+
+
+function nav = wait_for_nav_key(escKey, backKey)
+% Wait for a key press. Returns 'back' for Backspace, 'next' for any other
+% key. Escape aborts. Waits for any held key to be released first, so a
+% single press cannot skip two pages.
+    while KbCheck; end
+    while true
+        [keyIsDown, ~, keyCode] = KbCheck;
+        if keyIsDown
+            if keyCode(escKey)
+                error('show_instructions:userAbort', 'User pressed Escape -- aborting.');
+            end
+            if keyCode(backKey)
+                nav = 'back';
+            else
+                nav = 'next';
+            end
+            while KbCheck; end
+            return;
+        end
+        WaitSecs(0.001);
     end
 end
 

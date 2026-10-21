@@ -9,14 +9,13 @@ function lines = build_arrow_instruction_lines(attention, mode)
 %
 % INPUTS
 %   attention - 'low' or 'high' (block.attention)
-%   mode      - 'start' (block beginning), 'continue' (post-probe reminder)
-%               or 'recalibrated' (reminder after a C-key recalibration)
+%   mode      - 'start' (block beginning) or 'continue' (post-probe reminder)
 %
 % OUTPUT
 %   lines - cell array of strings for draw_probe_screen
 
-    if ~any(strcmpi(mode, {'start', 'continue', 'recalibrated'}))
-        error('build_arrow_instruction_lines:badMode', 'mode must be ''start'', ''continue'' or ''recalibrated''.');
+    if ~any(strcmpi(mode, {'start', 'continue'}))
+        error('build_arrow_instruction_lines:badMode', 'mode must be ''start'' or ''continue''.');
     end
 
     if strcmpi(mode, 'start')
@@ -25,16 +24,6 @@ function lines = build_arrow_instruction_lines(attention, mode)
         else
             lines = {'This block:', '', 'The YELLOW UPRIGHT arrows', ...
                 'AND the GREEN DOWNWARD (inverted) arrows.', '', 'Press any key to begin.'};
-        end
-    elseif strcmpi(mode, 'recalibrated')
-        % after a C-key recalibration (no probe): same block carries on
-        if strcmpi(attention, 'low')
-            lines = {'Frames adjusted - same block continues.', '', ...
-                'Continue counting the RED arrows only.', '', 'Press any key to continue.'};
-        else
-            lines = {'Frames adjusted - same block continues.', '', ...
-                'Continue counting the YELLOW UPRIGHT arrows', ...
-                'AND the GREEN DOWNWARD (inverted) arrows.', '', 'Press any key to continue.'};
         end
     else
         % post-probe: same block carries on

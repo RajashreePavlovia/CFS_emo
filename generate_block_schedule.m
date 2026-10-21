@@ -22,9 +22,7 @@ function schedule = generate_block_schedule(cfg, participant_id, rng_seed)
 %         .attention        ('low'/'high')
 %         .awareness        ('aware'/'unaware')
 %         .emotion          ('happy'/'angry'/'neutral')
-%         .probe_trials     - row vector: trial number(s) after which a probe fires
-%                             (cfg.probes_per_block of them, sorted)
-%         .probe_trial      - the first of those (kept for older scripts)
+%         .probe_trial      - trial number (15-36) after which the probe fires
 %         .trials(1:36)     - struct array, each with:
 %             .n_targets
 %             .arrow_seq    - output of generate_rsvp_trial
@@ -78,10 +76,7 @@ function schedule = generate_block_schedule(cfg, participant_id, rng_seed)
         block.attention = cond.attention;
         block.awareness = cond.awareness;
         block.emotion   = cond.emotion;
-        % trial number(s) after which a thought probe fires (1 or more per
-        % block, see cfg.probes_per_block and choose_probe_trials.m)
-        block.probe_trials = choose_probe_trials(cfg);
-        block.probe_trial  = block.probe_trials(1);   % kept for older scripts: the FIRST probe
+        block.probe_trial = randi(cfg.probe_trial_range);
 
         % target-count list for this block's 36 trials, balanced + no adjacent repeat
         if strcmpi(cond.attention, 'low')

@@ -11,14 +11,9 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
 %   present, without also dual-tasking. Counting accuracy over the last
 %   cfg.practice_criterion_last_n trials of each load level (pooled across
 %   its aware+unaware block) is checked against cfg.practice_pass_easy /
-%   cfg.practice_pass_hard.
-%
-%   REPEATS ONLY WHAT IS NOT LEARNED: if the participant reaches criterion
-%   for one load level but not the other, pressing R repeats ONLY the two
-%   blocks (aware + unaware) of the load level that has not been learned.
-%   A level that has been passed stays passed (its accuracy from the attempt
-%   where it passed is kept). Press any other key to end the session early
-%   (not ready for Phase 2 / main task).
+%   cfg.practice_pass_hard. If not met, the participant can repeat Phase 1
+%   (press R) without the window closing; press any other key to end the
+%   session early (not ready for Phase 2 / main task).
 %
 % PHASE 2 - QUEST (dual task): 2 blocks, easy-unaware and hard-unaware,
 %   order randomized. Only run once Phase 1 has passed. The face-report
@@ -35,21 +30,10 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
 %
 % A per-trial log is written to data\p<ID>_practice_trials_<timestamp>.csv.
 % Pause key is NOT active during practice. Escape aborts.
-%
-% CALIBRATION KEY (cfg.keys.calib_key, 'c'): works on every practice screen
-% and during trials, exactly as in the main session. On a screen it opens the
-% fusion calibration at once and then shows the same screen again. During a
-% trial it is latched: the trial (and its feedback) finishes, then the
-% calibration screen appears, then the next trial starts. In the last trial
-% of a block, the next block's scheduled calibration covers it.
 
     KbName('UnifyKeyNames');
-    key_flag('calib', 'clear');
-    key_flag('pause', 'clear');
 
-    % calibration context: carries the CURRENT fusion geometry; every screen
-    % draws from it, so a recalibration anywhere updates everything after it
-    ctx = make_calib_ctx(winRect, frameSizePx, participant_id);
+    calib_state = [];   % carried from block to block
 
     [faceTextures, identities] = load_practice_faces(win, cfg);
 
@@ -79,49 +63,37 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
 
     phase1_attempt = 0;
     passed = false;
-    % per-load-level status, carried ACROSS attempts so a level that has been
-    % learned is not practised again
-    passed_easy = false;   acc_easy = NaN;
-    passed_hard = false;   acc_hard = NaN;
+    frameDestRects = struct(); % kept in scope for the repeat-prompt screen below
 
     while ~passed
         phase1_attempt = phase1_attempt + 1;
+        fprintf('\n=== PRACTICE Phase 1 (RSVP learning), attempt %d ===\n', phase1_attempt);
 
-        % blocks to run this attempt: only the load level(s) not yet passed
-        % (attempt 1: all four blocks)
-        lvl  = {learn_conditions.attention};
-        todo = find((strcmp(lvl, 'low') & ~passed_easy) | (strcmp(lvl, 'high') & ~passed_hard));
-        order = todo(randperm(numel(todo)));
-        n_p1_blocks = numel(order);
-
-        fprintf('\n=== PRACTICE Phase 1 (RSVP learning), attempt %d: %d block(s) ===\n', phase1_attempt, n_p1_blocks);
-        if phase1_attempt > 1
-            if passed_easy
-                fprintf('    Easy load already learned -- only HARD load blocks are repeated.\n');
-            elseif passed_hard
-                fprintf('    Hard load already learned -- only EASY load blocks are repeated.\n');
-            end
-        end
-
+        order = randperm(4);
         lastN_hits = struct('low', [], 'high', []);
 
-        for bi = 1:n_p1_blocks
+        for bi = 1:4
             b = order(bi);
             attn = learn_conditions(b).attention;
             awr  = learn_conditions(b).awareness;
-            fprintf('\n--- Phase 1 block %d/%d: attention=%s, awareness=%s ---\n', bi, n_p1_blocks, attn, awr);
+            fprintf('\n--- Phase 1 block %d/4: attention=%s, awareness=%s ---\n', bi, attn, awr);
 
-            ctx.block_num = bi;
-            ctx = recalibrate_now(win, cfg, ppd, winRect, ctx, false);
+            [separation_px, frame_offsets, calib_state] = run_fusion_calibration(win, cfg, ppd, bi, participant_id, calib_state);
+            centers = compute_frame_centers(winRect, separation_px, frame_offsets);
+            frameDestRects = struct();
+            frameDestRects.left  = CenterRectOnPoint([0 0 frameSizePx frameSizePx], centers.left(1),  centers.left(2));
+            frameDestRects.right = CenterRectOnPoint([0 0 frameSizePx frameSizePx], centers.right(1), centers.right(2));
 
             if phase1_attempt == 1 && bi == 1
-                ctx = show_instructions(win, cfg, frameTex, winRect, ctx, ppd);
+                show_instructions(win, cfg, frameTex, winRect, frameDestRects, ppd);
             end
 
             target_lines = get_target_lines(attn);
             note = 'Other visual patterns may appear on screen. Ignore them and keep counting.';
-            intro = [{sprintf('PRACTICE %d of %d', bi, n_p1_blocks), ''}, target_lines, {'', note, '', 'Press any key to begin.'}];
-            ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, intro);
+            intro = [{sprintf('PRACTICE %d of 4', bi), ''}, target_lines, {'', note, '', 'Press any key to begin.'}];
+            draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, intro);
+            Screen('Flip', win);
+            wait_key_name();
 
             trials = build_learning_trials(cfg, attn, awr, identities, cfg.practice_trials_per_block);
             cfg_l = cfg;
@@ -129,33 +101,18 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
             hits = zeros(1, numel(trials));
             for t = 1:numel(trials)
                 trial = trials(t);
-                res = run_full_trial(win, cfg_l, ifi, ppd, trial, awr, ctx.centers, ...
+                res = run_full_trial(win, cfg_l, ifi, ppd, trial, awr, centers, ...
                     sides.dominant_screen_half, sides.nondominant_screen_half, ...
-                    faceTextures, maskTextures, frameTex, ctx.frameDestRects);
+                    faceTextures, maskTextures, frameTex, frameDestRects);
                 hits(t) = double(res.correct);
                 log_practice_trial(log_path, participant_id, phase1_attempt, bi, attn, awr, 'learning', t, ...
                     trial, res, cfg_l.face_contrast, '', NaN, MAX_RSVP_ITEMS);
                 fprintf('  Learning %d/%d: targets=%d, response=%s, correct=%d\n', ...
                     t, numel(trials), res.n_targets_actual, mat2str(res.response), res.correct);
-                show_count_feedback(win, cfg, frameTex, winRect, ctx.frameDestRects, ppd, res);
-
-                % C pressed during this trial: recalibrate now -- AFTER the trial
-                % finished, was logged and its feedback was shown, BEFORE the
-                % next trial. (After a block's last trial the next scheduled
-                % calibration covers it.)
-                if key_flag('calib', 'get')
-                    if t < numel(trials)
-                        fprintf('  C pressed: recalibrating before the next trial.\n');
-                        ctx = recalibrate_now(win, cfg, ppd, winRect, ctx, true);
-                        ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, ...
-                            [{'Frames adjusted.', ''}, target_lines, {'', 'Press any key to continue.'}]);
-                    else
-                        key_flag('calib', 'clear');
-                    end
-                end
+                show_count_feedback(win, cfg, frameTex, winRect, frameDestRects, ppd, res);
             end
             % --- practice thought questions at the end of this practice block ---
-            ctx = run_practice_probe(win, cfg, winRect, frameTex, ctx, ppd, participant_id, ...
+            run_practice_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, participant_id, ...
                 probe_log_path, sprintf('phase1_attempt%d_block%d', phase1_attempt, bi), n_practice_probes == 0);
             n_practice_probes = n_practice_probes + 1;
 
@@ -163,35 +120,25 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
             lastN_hits.(attn) = [lastN_hits.(attn), hits(end-n_last+1:end)];
         end
 
-        % Update ONLY the load level(s) that were practised this attempt; a
-        % level that already passed keeps its status and its accuracy.
-        ran_easy = ~isempty(lastN_hits.low);
-        ran_hard = ~isempty(lastN_hits.high);
-        if ran_easy
-            acc_easy = mean(lastN_hits.low);
-            passed_easy = acc_easy >= cfg.practice_pass_easy;
-        end
-        if ran_hard
-            acc_hard = mean(lastN_hits.high);
-            passed_hard = acc_hard >= cfg.practice_pass_hard;
-        end
+        acc_easy = mean(lastN_hits.low);
+        acc_hard = mean(lastN_hits.high);
+        passed_easy = acc_easy >= cfg.practice_pass_easy;
+        passed_hard = acc_hard >= cfg.practice_pass_hard;
         passed = passed_easy && passed_hard;
 
         fprintf('\n-- Phase 1 results (attempt %d) --\n', phase1_attempt);
-        fprintf('Easy accuracy: %.0f%% (needs %.0f%%) -> %s%s\n', 100*acc_easy, 100*cfg.practice_pass_easy, ...
-            pass_text(passed_easy), ternary(ran_easy, '', '  [kept from an earlier attempt]'));
-        fprintf('Hard accuracy: %.0f%% (needs %.0f%%) -> %s%s\n', 100*acc_hard, 100*cfg.practice_pass_hard, ...
-            pass_text(passed_hard), ternary(ran_hard, '', '  [kept from an earlier attempt]'));
+        fprintf('Easy accuracy: %.0f%% (needs %.0f%%) -> %s\n', 100*acc_easy, 100*cfg.practice_pass_easy, pass_text(passed_easy));
+        fprintf('Hard accuracy: %.0f%% (needs %.0f%%) -> %s\n', 100*acc_hard, 100*cfg.practice_pass_hard, pass_text(passed_hard));
 
         if ~passed
-            repeat_easy_txt = ternary(passed_easy, 'OK', 'REPEAT');
-            repeat_hard_txt = ternary(passed_hard, 'OK', 'REPEAT');
-            repeat_lines = {'RSVP practice not yet at criterion.', '', ...
-                 sprintf('Easy: %.0f%% (need %.0f%%) %s', 100*acc_easy, 100*cfg.practice_pass_easy, repeat_easy_txt), ...
-                 sprintf('Hard: %.0f%% (need %.0f%%) %s', 100*acc_hard, 100*cfg.practice_pass_hard, repeat_hard_txt), ...
-                 '', 'Experimenter: press R to repeat only the level(s) marked REPEAT, or any other key to end.'};
-            fprintf('Criteria NOT met. Press R to repeat only the level(s) not passed, or any other key to end the session.\n');
-            [ctx, key] = pwait(win, cfg, ppd, winRect, frameTex, ctx, repeat_lines);
+            draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, ...
+                {'RSVP practice not yet at criterion.', '', ...
+                 sprintf('Easy: %.0f%% (need %.0f%%)', 100*acc_easy, 100*cfg.practice_pass_easy), ...
+                 sprintf('Hard: %.0f%% (need %.0f%%)', 100*acc_hard, 100*cfg.practice_pass_hard), ...
+                 '', 'Experimenter: press R to repeat, or any other key to end.'});
+            Screen('Flip', win);
+            fprintf('Criteria NOT met. Press R to repeat the RSVP practice, or any other key to end the session.\n');
+            key = wait_key_name();
             if ~strcmpi(key, 'r')
                 practice = struct('participant_id', participant_id, 'dominant_eye', dominant_eye, ...
                     'phase1_attempt', phase1_attempt, 'accuracy_easy', acc_easy, 'accuracy_hard', acc_hard, ...
@@ -201,7 +148,7 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
                 fprintf('Session ended after Phase 1 (not ready for QUEST / main task).\n');
                 return;
             end
-            % otherwise: loop repeats Phase 1 (only the unpassed level), window stays open
+            % otherwise: loop repeats Phase 1 from the top, window stays open
         end
     end
 
@@ -216,26 +163,24 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
         attn = quest_loads{quest_order(qi)};
         block_num = 4 + qi;
 
-        ctx.block_num = block_num;
-        ctx = recalibrate_now(win, cfg, ppd, winRect, ctx, false);
+        [separation_px, frame_offsets, calib_state] = run_fusion_calibration(win, cfg, ppd, block_num, participant_id, calib_state);
+        centers = compute_frame_centers(winRect, separation_px, frame_offsets);
+        frameDestRects = struct();
+        frameDestRects.left  = CenterRectOnPoint([0 0 frameSizePx frameSizePx], centers.left(1),  centers.left(2));
+        frameDestRects.right = CenterRectOnPoint([0 0 frameSizePx frameSizePx], centers.right(1), centers.right(2));
 
         target_lines = get_target_lines(attn);
         intro = [{sprintf('PRACTICE %d of 2 (final part)', qi), ''}, target_lines, ...
             {'', 'Keep counting as before.', '', 'Press any key to begin.'}];
-        ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, intro);
+        draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, intro);
+        Screen('Flip', win);
+        wait_key_name();
 
-        [thr, qh, ctx] = run_quest_phase(win, cfg, ifi, ppd, attn, sides, ...
+        [thr, qh] = run_quest_phase(win, cfg, ifi, ppd, attn, centers, frameDestRects, sides, ...
             faceTextures, maskTextures, frameTex, winRect, identities, ...
-            log_path, participant_id, phase1_attempt, block_num, MAX_RSVP_ITEMS, ctx);
+            log_path, participant_id, phase1_attempt, block_num, MAX_RSVP_ITEMS);
         quest_thr.(attn)  = thr;
         quest_hist.(attn) = qh;
-    end
-
-    % C pressed in the very last QUEST trial: honour it now, so the
-    % calibration saved for the main session is the latest one
-    if key_flag('calib', 'get')
-        fprintf('  C pressed in the last practice trial: recalibrating now.\n');
-        ctx = recalibrate_now(win, cfg, ppd, winRect, ctx, true);
     end
 
     contrast_base = min([quest_thr.low, quest_thr.high]);
@@ -247,7 +192,7 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
         'accuracy_easy', acc_easy, 'accuracy_hard', acc_hard, ...
         'passed_easy', passed_easy, 'passed_hard', passed_hard, 'passed', true, ...
         'quest_easy', quest_hist.low, 'quest_hard', quest_hist.high, ...
-        'calib_state', ctx.calib_state, ...
+        'calib_state', calib_state, ...
         'timestamp', timestamp);
     save(fullfile(data_dir, sprintf('p%d_practice.mat', participant_id)), 'practice');
 
@@ -258,33 +203,17 @@ function run_practice_session(win, winRect, cfg, ifi, ppd, frameTex, frameSizePx
     fprintf('Main-task face contrast will be: %.3f  (= %.2f x base)\n', ...
         cfg.unaware_contrast_fraction * contrast_base, cfg.unaware_contrast_fraction);
 
+    draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, ...
+        {'Practice complete.', '', 'Please wait for the experimenter.'});
+    Screen('Flip', win);
     fprintf('Press any key to finish. Then run run_experiment_session again and type "main" for this participant.\n');
-    pwait(win, cfg, ppd, winRect, frameTex, ctx, {'Practice complete.', '', 'Please wait for the experimenter.'});
+    wait_key_name();
 end
 
 
 %% ====================== helpers ======================
 
-function [ctx, name] = pwait(win, cfg, ppd, winRect, frameTex, ctx, lines)
-% Show a text screen (in both eyes' frames) and wait for a key. C does not
-% count as "continue": it recalibrates and the same screen is redrawn on the
-% new frames (see wait_key_or_calib). Escape aborts. Returns the pressed
-% key's name.
-    [ctx, name] = wait_key_or_calib(win, cfg, ppd, winRect, ctx, ...
-        @(c) flip_probe_screen(win, cfg, frameTex, winRect, c.frameDestRects, ppd, lines));
-end
-
-
-function out = ternary(cond, a, b)
-    if cond
-        out = a;
-    else
-        out = b;
-    end
-end
-
-
-function ctx = run_practice_probe(win, cfg, winRect, frameTex, ctx, ppd, participant_id, probe_log_path, tag, full_intro)
+function run_practice_probe(win, cfg, winRect, frameTex, frameDestRects, ppd, participant_id, probe_log_path, tag, full_intro)
 % Run one full thought-probe sequence at the end of a practice block, so
 % participants see the kinds of questions that appear in the main task.
 % Answers are logged to the practice probes CSV but have no effect on the
@@ -299,9 +228,11 @@ function ctx = run_practice_probe(win, cfg, winRect, frameTex, ctx, ppd, partici
     else
         intro = {'Practice thought questions', '', 'Press any key to continue.'};
     end
-    ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, intro);
+    draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, intro);
+    Screen('Flip', win);
+    wait_key_name();
 
-    pr = run_probe_sequence(win, cfg, winRect, frameTex, ctx.frameDestRects, ppd, probe1_order);
+    pr = run_probe_sequence(win, cfg, winRect, frameTex, frameDestRects, ppd, probe1_order);
 
     append_csv_row(probe_log_path, {participant_id, tag, ...
         pr.probe1_label, pr.probe1_rt_s, pr.probe2_label, pr.probe2_rt_s, ...
@@ -310,7 +241,10 @@ function ctx = run_practice_probe(win, cfg, winRect, frameTex, ctx, ppd, partici
         pr.current_concerns, pr.current_concerns_rt_s});
     fprintf('  Practice probe (%s): %s\n', tag, pr.probe1_label);
 
-    ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, {'Questions finished.', '', 'Press any key to continue.'});
+    draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, ...
+        {'Questions finished.', '', 'Press any key to continue.'});
+    Screen('Flip', win);
+    wait_key_name();
 end
 
 
@@ -382,11 +316,9 @@ function [trial, last_mask_id] = make_practice_trial(cfg, attn, awr, identity, f
 end
 
 
-function [thr_alpha, qh, ctx] = run_quest_phase(win, cfg, ifi, ppd, attn, sides, ...
-    faceTextures, maskTextures, frameTex, winRect, identities, log_path, participant_id, attempt, b, MAX_RSVP_ITEMS, ctx)
+function [thr_alpha, qh] = run_quest_phase(win, cfg, ifi, ppd, attn, centers, frameDestRects, sides, ...
+    faceTextures, maskTextures, frameTex, winRect, identities, log_path, participant_id, attempt, b, MAX_RSVP_ITEMS)
 % QUEST on log10(face contrast). Success = correct side reported.
-% Takes and returns the calibration context so a C-key recalibration between
-% trials carries on into the following trials.
 
     leftLbl  = key_label_local(cfg.keys.face_report_keys.left);
     rightLbl = key_label_local(cfg.keys.face_report_keys.right);
@@ -399,7 +331,9 @@ function [thr_alpha, qh, ctx] = run_quest_phase(win, cfg, ifi, ppd, attn, sides,
         sprintf('%s = face on the RIGHT', rightLbl), ...
         sprintf('%s = I did NOT see a face', noneLbl), ...
         '', 'Answer honestly. If you did not see a face, do not guess.', '', 'Press any key to begin.'};
-    ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, intro);
+    draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, intro);
+    Screen('Flip', win);
+    wait_key_name();
 
     q = QuestCreate(log10(cfg.quest_start_contrast), cfg.quest_prior_sd, cfg.quest_p_threshold, ...
         cfg.quest_beta, cfg.quest_delta, cfg.quest_gamma, 0.01, 4);
@@ -410,7 +344,6 @@ function [thr_alpha, qh, ctx] = run_quest_phase(win, cfg, ifi, ppd, attn, sides,
     else
         pool = cfg.high_load_target_counts;
     end
-    target_lines = get_target_lines(attn);
     n_ids = numel(identities);
     id_queue = [];
     last_mask_id = [];
@@ -442,13 +375,11 @@ function [thr_alpha, qh, ctx] = run_quest_phase(win, cfg, ifi, ppd, attn, sides,
 
         cfg_t = cfg;
         cfg_t.face_contrast = alpha;
-        res = run_full_trial(win, cfg_t, ifi, ppd, trial, 'unaware', ctx.centers, ...
+        res = run_full_trial(win, cfg_t, ifi, ppd, trial, 'unaware', centers, ...
             sides.dominant_screen_half, sides.nondominant_screen_half, ...
-            faceTextures, maskTextures, frameTex, ctx.frameDestRects);
+            faceTextures, maskTextures, frameTex, frameDestRects);
 
-        % forced face-location report (standalone ask_face_side.m; it also
-        % latches a C press, like every other screen)
-        report  = ask_face_side(win, cfg, frameTex, winRect, ctx.frameDestRects, ppd);
+        report  = ask_face_side(win, cfg, frameTex, winRect, frameDestRects, ppd);
         success = strcmp(report, face_side);
         q = QuestUpdate(q, t_log, double(success));
 
@@ -459,20 +390,7 @@ function [thr_alpha, qh, ctx] = run_quest_phase(win, cfg, ifi, ppd, attn, sides,
         fprintf('  QUEST %d: contrast=%.3f, face=%s, report=%s, success=%d\n', ...
             n, alpha, face_side, report, success);
 
-        done = n >= cfg.quest_max_trials || (n >= cfg.quest_min_trials && QuestSd(q) <= cfg.quest_sd_stop);
-
-        % C pressed during this trial (or its face report): recalibrate now,
-        % after everything for this trial is recorded and before the next one.
-        % If this was the block's last trial the flag stays latched; the next
-        % scheduled calibration (or the end-of-practice check) handles it.
-        if ~done && key_flag('calib', 'get')
-            fprintf('  C pressed: recalibrating before the next trial.\n');
-            ctx = recalibrate_now(win, cfg, ppd, winRect, ctx, true);
-            ctx = pwait(win, cfg, ppd, winRect, frameTex, ctx, ...
-                [{'Frames adjusted.', ''}, target_lines, {'', 'Press any key to continue.'}]);
-        end
-
-        if done
+        if n >= cfg.quest_max_trials || (n >= cfg.quest_min_trials && QuestSd(q) <= cfg.quest_sd_stop)
             break;
         end
     end
@@ -505,6 +423,44 @@ function s = pick_face_side(hist)
 end
 
 
+function report = ask_face_side(win, cfg, frameTex, winRect, frameDestRects, ppd)
+% Forced report after a QUEST trial: 'left', 'right' or 'none'.
+    escKey   = KbName('ESCAPE');
+    leftKey  = KbName(cfg.keys.face_report_keys.left);
+    rightKey = KbName(cfg.keys.face_report_keys.right);
+    noneKey  = KbName(cfg.keys.quest_none_key);
+
+    lines = {'Where was the face?', '', ...
+        sprintf('%s = LEFT', key_label_local(cfg.keys.face_report_keys.left)), ...
+        sprintf('%s = RIGHT', key_label_local(cfg.keys.face_report_keys.right)), ...
+        sprintf('%s = did NOT see a face', key_label_local(cfg.keys.quest_none_key))};
+    draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, lines);
+    Screen('Flip', win);
+
+    while KbCheck; end   % wait for any held key to be released
+    while true
+        [keyIsDown, ~, keyCode] = KbCheck;
+        if keyIsDown
+            if keyCode(escKey)
+                error('run_practice_session:userAbort', 'User pressed Escape -- aborting.');
+            end
+            if keyCode(leftKey)
+                report = 'left';
+                break;
+            elseif keyCode(rightKey)
+                report = 'right';
+                break;
+            elseif keyCode(noneKey)
+                report = 'none';
+                break;
+            end
+        end
+        WaitSecs(0.001);
+    end
+    while KbCheck; end
+end
+
+
 function show_count_feedback(win, cfg, frameTex, winRect, frameDestRects, ppd, res)
     if res.timed_out
         msg = {'Too slow.', '', sprintf('The correct number was %d.', res.n_targets_actual)};
@@ -515,23 +471,7 @@ function show_count_feedback(win, cfg, frameTex, winRect, frameDestRects, ppd, r
     end
     draw_probe_screen(win, cfg, frameTex, winRect, frameDestRects, ppd, msg);
     Screen('Flip', win);
-    % poll for C during the feedback screen (latch only; Escape aborts)
-    KbName('UnifyKeyNames');
-    calibKey = KbName(cfg.keys.calib_key);
-    escKey   = KbName('ESCAPE');
-    t_end = GetSecs + cfg.practice_feedback_s;
-    while GetSecs < t_end
-        [keyIsDown, ~, keyCode] = KbCheck;
-        if keyIsDown
-            if keyCode(escKey)
-                error('run_practice_session:userAbort', 'User pressed Escape -- aborting.');
-            end
-            if keyCode(calibKey)
-                key_flag('calib', 'set');
-            end
-        end
-        WaitSecs(0.001);
-    end
+    WaitSecs(cfg.practice_feedback_s);
 end
 
 
@@ -640,6 +580,28 @@ function [faceTextures, identities] = load_practice_faces(win, cfg)
     if numel(identities) < 8
         warning('run_practice_session:identityCount', ...
             'Only %d complete practice identities found (expected around 12). Consider adding more before running real participants.', numel(identities));
+    end
+end
+
+
+function name = wait_key_name()
+% Wait for a key press and return its name. Escape aborts.
+    escKey = KbName('ESCAPE');
+    while KbCheck; end
+    while true
+        [keyIsDown, ~, keyCode] = KbCheck;
+        if keyIsDown
+            if keyCode(escKey)
+                error('run_practice_session:userAbort', 'User pressed Escape -- aborting.');
+            end
+            name = KbName(find(keyCode, 1));
+            if iscell(name)
+                name = name{1};
+            end
+            while KbCheck; end
+            return;
+        end
+        WaitSecs(0.001);
     end
 end
 
